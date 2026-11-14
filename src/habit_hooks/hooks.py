@@ -7,7 +7,11 @@ import sys
 from pathlib import Path
 
 from .cli import ensure_utf8_streams, run_console, version_line
+from .config import project_config_path
 from .init_command import run as run_init
+from .project_paths import project_relative
+from .recommend import LANGUAGE_SIGNALS
+from .setup import configure
 from .sensors import build_parser
 
 INIT = "init"
@@ -36,6 +40,22 @@ def print_usage() -> None:
     parser.print_help()
 
 
+def _prepare(args: list[str]) -> int:
+    selected = build_parser("habit-hooks").parse_args(args)
+    project_dir = Path.cwd()
+    if selected.config is not None or project_config_path(project_dir).is_file():
+        return 0
+    files = [
+        relative
+        for path in selected.file or []
+        if (relative := project_relative(path, project_dir))
+        and (project_dir / relative).is_file()
+    ]
+    if not any(name.endswith(signal.extensions) for signal in LANGUAGE_SIGNALS for name in files):
+        return 0
+    return configure(project_dir, files)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     ensure_utf8_streams()
@@ -47,6 +67,13 @@ def main(argv: list[str] | None = None) -> int:
     if any(flag in args for flag in ("--help", "-h")):
         print_usage()
         return 0
+    prepared = run_console("habit-hooks", _prepare, args)
+    if prepared:
+        return prepared
+    return _pipeline(args)
+
+
+def _pipeline(args: list[str]) -> int:
     sensors = subprocess.Popen([sibling("habit-sensors"), *args], stdout=subprocess.PIPE)
     mapper = subprocess.Popen(
         [sibling("habit-mapper"), *mapper_args(args)], stdin=sensors.stdout

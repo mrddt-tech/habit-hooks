@@ -63,12 +63,12 @@ def _install(commands: tuple[str, ...], attempted: set[str]) -> bool:
     return True
 
 
-def _ready(project_dir: Path) -> bool:
+def _ready(project_dir: Path, files: list[str] | None) -> bool:
     from .init_command import _write_config
 
     attempted: set[str] = set()
     while True:
-        planned = plan(project_dir)
+        planned = plan(project_dir, files)
         if not planned.uninstalled_plugins and not planned.missing_tools:
             if not planned.already_configured:
                 _write_config(project_dir, planned.plugins)
@@ -77,9 +77,9 @@ def _ready(project_dir: Path) -> bool:
             return False
 
 
-def configure(project_dir: Path) -> int:
+def configure(project_dir: Path, files: list[str] | None = None) -> int:
     before = _snapshot(project_dir)
-    ready = _ready(project_dir)
+    ready = _ready(project_dir, files)
     if ready:
         sys.stderr.write("habit-hooks configured\n")
     _changes(project_dir, before)
