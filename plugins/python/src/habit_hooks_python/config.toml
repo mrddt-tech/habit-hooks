@@ -1,13 +1,7 @@
-# Python plugin defaults.
 language = "python"
-# A project naming no `files` of its own scans what its plugins declare, so this
-# is the first run for anyone `habit-hooks init` set up. An installed package is
-# never the project's source; `site-packages` is where one lands whatever the
-# environment is called, so it answers for a `venv/` as well as a `.venv/`.
 files = ["**/*.py", "!**/site-packages/**", "!**/.venv/**", "!**/venv/**"]
 sensors = [
-  # Unmapped codes pass through under their own name; `uncoached` catches them.
-  { tool = "ruff", args = ["check", "--output-format=json", "--select=C901,PLR0913,PLR0915,F841,F401,BLE001", "${files}"], transform = "ruff.jq", success_exit_codes = [0, 1] },
+  { name = "ruff", tool = "${python}", args = ["${dir}/sensors/ruff_sensor.py", "${detector:ruff}", "${args}", "--", "${files}"], transform = "ruff.jq", success_exit_codes = [0, 1] },
   { name = "deptry", tool = "${python}", args = ["${dir}/sensors/deptry_sensor.py", "${detector:deptry}"] },
   { name = "comment", tool = "${python}", args = ["${dir}/comment.py", "${files}"] },
 ]

@@ -9,6 +9,7 @@ from pathlib import Path
 from .catalogue import incomplete_run_finding
 from .cli import EXIT_TOOL_ERROR, add_version_flag, run_console
 from .config import Config, load_config
+from .diagnostics import split_diagnostics, write_diagnostics
 from .merged_findings import merged
 from .rendering import (
     Rendered,
@@ -42,11 +43,18 @@ def run(
 ) -> int:
     config = load_config(project_dir, config_path)
     resolver = Resolver.discover(project_dir)
+    findings, diagnostics = split_diagnostics(findings)
     findings = coachable(findings, config, resolver)
-    if not findings:
+    if not findings and not diagnostics:
         clean = render_clean(config, resolver)
         sys.stdout.write(clean.text)
         return 0
+    rendered = write_coaching(findings, config, resolver)
+    write_diagnostics(diagnostics)
+    return 1 if diagnostics or any(r.blocks for r in rendered) else 0
+
+
+def write_coaching(findings: list[dict], config: Config, resolver: Resolver) -> list[Rendered]:
     rendered = [render_finding(f, config, resolver) for f in findings]
     blocks = [
         block(f, r.text) for f, r in zip(findings, rendered) if r.text.strip()
@@ -55,7 +63,7 @@ def run(
     if body:
         sys.stdout.write(body + "\n")
     write_stderr(rendered)
-    return 1 if any(r.blocks for r in rendered) else 0
+    return rendered
 
 
 def read_findings() -> list[dict] | None:
