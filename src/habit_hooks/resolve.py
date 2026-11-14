@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from functools import cache
 from importlib.metadata import entry_points
@@ -31,6 +32,14 @@ def installed_plugin_distributions() -> dict[str, str]:
         for entry_point in entry_points(group=PLUGIN_ENTRY_POINT_GROUP)
         if entry_point.dist is not None
     }
+
+
+def global_config_dir() -> Path:
+    configured = os.environ.get("XDG_CONFIG_HOME", "")
+    base = Path(configured) if configured else Path.home() / ".config"
+    if not base.is_absolute():
+        base = Path.home() / ".config"
+    return base / "habit-hooks"
 
 
 @dataclass(frozen=True)
@@ -77,15 +86,18 @@ class Resolver:
     def guide(self, guide: str, plugins: list[str]) -> Path | None:
         return self.first(plugins, [guide])
 
+    def _guide_dirs(self, plugins: list[str]) -> list[Path]:
+        global_dir = global_config_dir()
+        return [
+            *(self.project_dir / ".habit-hooks" / plugin / "guides" for plugin in plugins),
+            *(global_dir / plugin / "guides" for plugin in plugins),
+            global_dir / "guides",
+            *(self.package_dirs[plugin] / "guides" for plugin in plugins if plugin in self.package_dirs),
+            CORE_GUIDES,
+        ]
+
     def first(self, plugins: list[str], candidates: list[str]) -> Path | None:
-        for plugin in plugins:
-            for base in self.plugin_dirs(plugin):
-                for name in candidates:
-                    candidate = base / "guides" / name
-                    if candidate.is_file():
-                        return candidate
-        for name in candidates:
-            candidate = CORE_GUIDES / name
-            if candidate.is_file():
-                return candidate
-        return None
+        return next(
+            (base / name for base in self._guide_dirs(plugins) for name in candidates if (base / name).is_file()),
+            None,
+        )

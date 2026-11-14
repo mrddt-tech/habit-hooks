@@ -41,8 +41,9 @@ class Plan:
         )
 
 
-def plan(project_dir: Path) -> Plan:
-    files = git_listing.project_files(project_dir)
+def plan(project_dir: Path, files: list[str] | None = None) -> Plan:
+    if files is None:
+        files = git_listing.project_files(project_dir)
     languages = tuple(used_languages(project_dir, files))
     config = _project_config(project_dir)
     plugins = _plugins(languages, config)

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import shlex
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -11,14 +10,17 @@ from pathlib import Path
 from .config import project_config_path
 from .init_report import report
 from .initialise import plan
+from .project_paths import tool_executable
 
 
-def _parse(argv: list[str]) -> None:
-    argparse.ArgumentParser(
+def _parse(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
         prog="habit-hooks init",
         description="Set this project up: write .habit-hooks/config.toml and "
         "report what habit-hooks still needs installed.",
-    ).parse_args(argv)
+    )
+    parser.add_argument("--yes", action="store_true", help="Install without prompting.")
+    return parser.parse_args(argv)
 
 
 def _write_config(project_dir: Path, plugins: tuple[str, ...]) -> None:
@@ -43,13 +45,14 @@ def _agreed(count: int) -> bool:
     return sys.stdin.readline().strip().lower() in ("y", "yes")
 
 
-def _succeeded(command: str) -> bool:
-    _say(f"\n$ {command}")
-    sys.stdout.flush()
+def _succeeded(command: str, *, diagnostics: bool = False) -> bool:
+    output = sys.stderr if diagnostics else sys.stdout
+    output.write(f"\n$ {command}\n")
+    output.flush()
     try:
         argv = shlex.split(command)
-        argv[0] = shutil.which(argv[0]) or argv[0]
-        return subprocess.run(argv).returncode == 0
+        argv[0] = tool_executable(argv[0], Path.cwd()) or argv[0]
+        return subprocess.run(argv, stdout=sys.stderr if diagnostics else None).returncode == 0
     except (ValueError, IndexError, OSError):
         return False
 
@@ -74,8 +77,12 @@ def _offer(commands: tuple[str, ...]) -> None:
 
 
 def run(argv: list[str]) -> int:
-    _parse(argv)
+    args = _parse(argv)
     project_dir = Path.cwd()
+    if args.yes:
+        from .setup import configure
+
+        return configure(project_dir)
     planned = plan(project_dir)
     if not planned.already_configured:
         _write_config(project_dir, planned.plugins)
