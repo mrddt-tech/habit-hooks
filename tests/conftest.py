@@ -104,6 +104,20 @@ def uv_tool_installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def source_project(init_project: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    write_plugin(init_project, "python", {"config.toml": "detectors = []\n"})
+    (init_project / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    monkeypatch.chdir(init_project)
+    return init_project
+
+
+@pytest.fixture
+def ready_project(source_project: Path) -> Path:
+    (source_project / "pyproject.toml").write_text('[project]\nname = "example"\n', encoding="utf-8")
+    return source_project
+
+
+@pytest.fixture
 def toolless_project(init_project: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     empty = init_project.parent / "no-tools"
     empty.mkdir()
