@@ -1,10 +1,3 @@
-# What ruff's own JSON means as findings: each violation's code becomes the
-# smell it names in the catalogue, grouped into one finding per smell (jq's
-# group_by sorts them, as the old helper's `sorted` did). A code with no entry
-# above is not dropped — it passes through as a finding under the code's own
-# name, where the run's `uncoached` handling catches it: a code nobody
-# catalogued is still a violation the project should see and tune, and a drop
-# would be a clean run nobody ran.
 def smell:
   . as $code
   | {"C901": "high-complexity",
@@ -17,7 +10,8 @@ def smell:
 
 group_by(.code | smell)
 | map({smell: (.[0].code | smell),
-       details: {},
+       details: (if .[0].habit_hooks_project_rules and (.[0].code | smell) == .[0].code
+                 then {diagnostic: true, tool: "ruff"} else {} end),
        issues: map({key: .filename,
                     details: {file: .filename,
                               line: .location.row,
